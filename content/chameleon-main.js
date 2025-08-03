@@ -288,29 +288,42 @@
     try {
       console.log('[Chameleon Main] Checking for initial data...');
       
-      // Verificar que los datos iniciales estén disponibles
-      if (!window.__chameleonInitData) {
-        console.error('[Chameleon Main] No initial data found');
-        // Esperar un poco y reintentar
-        await new Promise(resolve => setTimeout(resolve, 100));
-        if (!window.__chameleonInitData) {
-          throw new Error('Initial data not available after wait');
+      // Obtener semilla de sesión
+      let sessionSeed = window.__chameleonInitData?.sessionSeed;
+      if (!sessionSeed) {
+        const sessionInfo = await sendToIsolated('getSessionInfo');
+        if (sessionInfo && sessionInfo.seed) {
+          sessionSeed = sessionInfo.seed;
+        } else {
+          const array = new Uint8Array(32);
+          crypto.getRandomValues(array);
+          sessionSeed = Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+          console.warn('[Chameleon Main] Using locally generated seed');
         }
       }
-      
-      const { profilesData, sessionSeed } = window.__chameleonInitData;
-      
-      console.log('[Chameleon Main] Using injected profiles data');
-      ChameleonState.profilesData = profilesData;
-      
-      console.log('[Chameleon Main] Using session seed:', sessionSeed.substring(0, 8) + '...');
       ChameleonState.seed = sessionSeed;
-      
+      console.log('[Chameleon Main] Using session seed:', sessionSeed.substring(0, 8) + '...');
+
+      // Cargar datos de perfiles si no están disponibles
+      let profilesData = window.__chameleonInitData?.profilesData;
+      if (!profilesData) {
+        try {
+          const extensionOrigin = new URL(document.currentScript.src).origin;
+          const response = await fetch(`${extensionOrigin}/data/profiles.json`);
+          profilesData = await response.json();
+          console.log('[Chameleon Main] Loaded profiles data');
+        } catch (err) {
+          console.error('[Chameleon Main] Failed to load profiles data:', err);
+          throw new Error('Failed to load profiles data');
+        }
+      }
+      ChameleonState.profilesData = profilesData;
+
       console.log('[Chameleon Main] Generating profile...');
       const generator = ProfileGenerator(ChameleonState.profilesData, ChameleonState.seed);
       ChameleonState.profile = generator.generate();
       console.log('[Chameleon Main] Generated profile:', ChameleonState.profile.summary);
-      
+
       ChameleonState.platform = detectPlatform();
       console.log('[Chameleon Main] Detected platform:', ChameleonState.platform);
       
