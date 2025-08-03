@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chameleon - Advanced Anti-Fingerprinting",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "description": "Genera perfiles de navegador dinámicos y plausibles para mitigar el fingerprinting avanzado.",
   "minimum_chrome_version": "102",
   "permissions": [
@@ -60,4 +60,5 @@
       "matches": ["<all_urls>"]
     }
   ]
+
 }
