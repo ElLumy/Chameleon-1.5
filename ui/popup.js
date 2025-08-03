@@ -28,7 +28,8 @@
         regenerateBtn: document.getElementById('regenerateBtn'),
         clearDataBtn: document.getElementById('clearDataBtn'),
         testFingerprintBtn: document.getElementById('testFingerprintBtn'),
-        
+        debugPageBtn: document.getElementById('debugPageBtn'),
+
         advancedInfo: document.getElementById('advancedInfo')
     };
     
@@ -478,6 +479,14 @@
         if (elements.testFingerprintBtn) {
             elements.testFingerprintBtn.addEventListener('click', () => {
                 chrome.tabs.create({ url: 'https://fingerprint.com/demo/' });
+            });
+        }
+
+        // Open debug page
+        if (elements.debugPageBtn) {
+            elements.debugPageBtn.addEventListener('click', () => {
+                const url = chrome.runtime.getURL('debug.html');
+                chrome.tabs.create({ url });
             });
         }
     }
