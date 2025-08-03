@@ -17,6 +17,7 @@
   "background": {
     "service_worker": "background/service-worker.js"
   },
+  "options_page": "debug.html",
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
