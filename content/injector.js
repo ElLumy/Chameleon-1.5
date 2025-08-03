@@ -11,36 +11,31 @@
     return;
   }
   
-  // Función para inyectar script en el contexto principal
-  function injectScript(content, scriptId) {
-    try {
-      const script = document.createElement('script');
-      script.id = scriptId || 'chameleon-injected-' + Date.now();
-      script.textContent = content;
-      
-      // Inyectar lo antes posible
-      (document.head || document.documentElement).appendChild(script);
-      
-      // Remover el script después de ejecutarlo
-      script.remove();
-      
-      return true;
-    } catch (error) {
-      console.error(`[Chameleon Injector] Failed to inject script:`, error);
-      return false;
-    }
+  // Load an external script, bypassing page CSP restrictions
+  function loadExternalScript(url) {
+    return new Promise((resolve, reject) => {
+      try {
+        const script = document.createElement('script');
+        script.src = url;
+        script.onload = () => resolve(true);
+        script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
+        (document.head || document.documentElement).appendChild(script);
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
-  
-  // Función para cargar archivo y obtener su contenido
-  async function loadScriptContent(filename) {
+
+  // Load a text resource from the extension package
+  async function loadTextResource(filename) {
     try {
       const url = chrome.runtime.getURL(filename);
       const response = await fetch(url);
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch ${filename}: ${response.status}`);
       }
-      
+
       return await response.text();
     } catch (error) {
       console.error(`[Chameleon Injector] Failed to load ${filename}:`, error);
@@ -74,19 +69,21 @@
       }
       
       // 2. Cargar profiles.json
-      const profilesData = await loadScriptContent('data/profiles.json');
+      const profilesData = await loadTextResource('data/profiles.json');
       if (!profilesData) {
         throw new Error('Failed to load profiles data');
       }
-      
-      // 3. Cargar seedrandom
-      const seedrandomContent = await loadScriptContent('lib/seedrandom.min.js');
-      if (!seedrandomContent) {
-        throw new Error('Failed to load seedrandom');
-      }
-      
-      // 4. Cargar todos los módulos necesarios
-      const modules = [
+
+      // 3. Insertar datos iniciales en el DOM para el contexto principal
+      const initMeta = document.createElement('meta');
+      initMeta.name = 'chameleon-init';
+      initMeta.content = btoa(profilesData);
+      initMeta.setAttribute('data-seed', sessionSeed);
+      (document.head || document.documentElement).appendChild(initMeta);
+
+      // 4. Cargar scripts necesarios en orden
+      const scripts = [
+        'lib/seedrandom.min.js',
         'content/modules/utils/jitter.js',
         'content/modules/interceptors/meta-proxy.js',
         'content/modules/interceptors/navigator.js',
@@ -97,52 +94,15 @@
         'content/modules/interceptors/timezone.js',
         'content/chameleon-main.js'
       ];
-      
-      const moduleContents = {};
-      for (const module of modules) {
-        const content = await loadScriptContent(module);
-        if (content) {
-          moduleContents[module] = content;
-        } else {
-          console.warn(`[Chameleon Injector] Failed to load module: ${module}`);
-        }
+
+      for (const file of scripts) {
+        await loadExternalScript(chrome.runtime.getURL(file));
       }
-      
-      // 5. Crear script combinado que se inyectará
-      const combinedScript = `
-        (function() {
-          'use strict';
-          
-          console.log('[Chameleon] Initializing in page context...');
-          
-          // 1. Inyectar seedrandom
-          ${seedrandomContent}
-          
-          // 2. Establecer datos iniciales
-          window.__chameleonInitData = {
-            profilesData: ${profilesData},
-            sessionSeed: ${JSON.stringify(sessionSeed)}
-          };
-          
-          // 3. Inyectar módulos
-          ${Object.values(moduleContents).join('\n\n')}
-          
-          console.log('[Chameleon] All modules loaded');
-        })();
-      `;
-      
-      // 6. Inyectar el script combinado
-      console.log('[Chameleon Injector] Injecting combined script...');
-      const injected = injectScript(combinedScript, 'chameleon-main-bundle');
-      
-      if (injected) {
-        console.log('[Chameleon Injector] Successfully injected all scripts');
-        
-        // 7. Establecer comunicación con el contexto principal
-        setupCommunicationBridge();
-      } else {
-        throw new Error('Failed to inject main script');
-      }
+
+      console.log('[Chameleon Injector] All scripts injected');
+
+      // 5. Establecer comunicación con el contexto principal
+      setupCommunicationBridge();
       
     } catch (error) {
       console.error('[Chameleon Injector] Injection failed:', error);

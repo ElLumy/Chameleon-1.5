@@ -286,19 +286,21 @@
   // Inicialización principal
   async function initialize() {
     try {
-      console.log('[Chameleon Main] Checking for initial data...');
-      
-      // Verificar que los datos iniciales estén disponibles
-      if (!window.__chameleonInitData) {
-        console.error('[Chameleon Main] No initial data found');
-        // Esperar un poco y reintentar
-        await new Promise(resolve => setTimeout(resolve, 100));
-        if (!window.__chameleonInitData) {
-          throw new Error('Initial data not available after wait');
-        }
+      console.log('[Chameleon Main] Reading initial data...');
+      const initMeta = document.querySelector('meta[name="chameleon-init"]');
+      if (!initMeta) {
+        throw new Error('Initial data meta tag missing');
       }
-      
-      const { profilesData, sessionSeed } = window.__chameleonInitData;
+      let profilesData;
+      try {
+        profilesData = JSON.parse(atob(initMeta.content));
+      } catch (e) {
+        throw new Error('Failed to parse profiles data');
+      }
+      const sessionSeed = initMeta.getAttribute('data-seed');
+      if (!sessionSeed) {
+        throw new Error('Session seed missing');
+      }
       
       console.log('[Chameleon Main] Using injected profiles data');
       ChameleonState.profilesData = profilesData;
@@ -411,7 +413,6 @@
       window.__chameleonState = ChameleonState;
       
       // Limpiar datos iniciales
-      delete window.__chameleonInitData;
       
       console.log('[Chameleon Main] Initialization complete!');
       
